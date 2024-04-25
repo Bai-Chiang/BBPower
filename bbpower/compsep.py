@@ -125,7 +125,8 @@ class BBCompSep(PipelineStage):
 
         # Keep only desired correlations
         self.pols = self.config['pol_channels']
-        corr_all = ['cl_ee', 'cl_eb', 'cl_be', 'cl_bb']
+        corr_all = ['cl_00', 'cl_0e', 'cl_0b', 'cl_e0', 'cl_b0',
+                    'cl_ee', 'cl_eb', 'cl_be', 'cl_bb']
         corr_keep = []
         for m1 in self.pols:
             for m2 in self.pols:
@@ -189,7 +190,11 @@ class BBCompSep(PipelineStage):
 
         # Get power spectra and covariances
         if self.config['bands'] == 'all':
-            if not (self.s_cov.covariance.covmat.shape[-1] == len(self.s.mean) == self.n_bpws * self.ncross):
+            # TODO: Correct this assertion. If both e and b are retained,
+            # the data will contain both "E_f90 x B_f90" and "B_f90 x E_f90",
+            # so there will be  more elements than ncross * nbpw
+            #if not (self.s_cov.covariance.covmat.shape[-1] == len(self.s.mean) == self.n_bpws * self.ncross):  # noqa
+            if not (self.s_cov.covariance.covmat.shape[-1] == len(self.s.mean)):
                 raise ValueError("C_ell vector's size is wrong")
 
         v2d = np.zeros([self.n_bpws, self.ncross])
