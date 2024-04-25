@@ -151,7 +151,7 @@ class BBCompSep(PipelineStage):
             s_noi.remove_selection(ell__lt=self.config['l_min'])
 
         if self.config['bands'] == 'all':
-            tr_names = sorted(list(self.s.tracers.keys()))
+            tr_names = list(self.s.tracers.keys())
         else:
             tr_names = self.config['bands']
         self.nfreqs = len(tr_names)
@@ -771,7 +771,7 @@ class BBCompSep(PipelineStage):
         print(pars)
         model_cls = self.model(pars)
         if self.config['bands'] == 'all':
-            tr_names = sorted(list(self.s.tracers.keys()))
+            tr_names = list(self.s.tracers.keys())
         else:
             tr_names = self.config['bands']
         if save_npz:
