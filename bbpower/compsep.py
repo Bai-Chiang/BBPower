@@ -657,7 +657,7 @@ class BBCompSep(PipelineStage):
                                             self.lnprob,
                                             backend=backend)
             if nsteps_use > 0:
-                sampler.run_mcmc(pos, nsteps_use, store=True, progress=False)
+                sampler.run_mcmc(pos, nsteps_use, store=True, progress=True)
                 end = time.time()
 
         return sampler, end-start
