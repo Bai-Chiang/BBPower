@@ -149,3 +149,43 @@ def get_convolved_seds(band_names, bpss, params):
                                  'dust')
         )
     return seds
+
+
+def get_rescaled_sky_cls_muK_CMB(nu1_ghz, nu2_ghz, lmax, params,
+                                 fname_camb_lens_nobb="./examples/data/camb_lens_nobb.dat"):  # noqa
+    """
+    Simple helper function that computes the cross-frequency C_ells of coadded
+    CMB, dust, and synchrotron between two channels with delta bandpasses at
+    nu1_ghz and nu2_ghz, assuming spatially homogeneous frequency scaling
+    (dust: modified blackbody, synchrotron: power law, CMB: unity)
+    """
+    (dls_sync_ee, dls_sync_bb,
+     dls_dust_ee, dls_dust_bb,
+     dls_cmb_ee, dls_cmb_bb) = get_component_spectra(
+        lmax, params, fname_camb_lens_nobb, 
+    )
+    f1_sync, f2_sync = [
+        comp_sed(nu, params["synch"]["nu0_s"], params["synch"]["beta_s"],
+                 None, "sync")
+        for nu in [nu1_ghz, nu2_ghz]
+    ]
+    f1_dust, f2_dust = [
+        comp_sed(nu, params["dust"]["nu0_d"], params["dust"]["beta_d"],
+                 params["dust"]["T_d"], "dust")
+        for nu in [nu1_ghz, nu2_ghz]
+    ]
+    f1_cmb, f2_cmb = [
+        comp_sed(nu, None, None, None, "cmb")
+        for nu in [nu1_ghz, nu2_ghz]
+    ]
+    dls_ee = (f1_sync*f2_sync*dls_sync_ee
+              + f1_dust*f2_dust*dls_dust_ee
+              + f1_cmb*f2_cmb*dls_cmb_ee)
+    dls_bb = (f1_sync*f2_sync*dls_sync_bb
+              + f1_dust*f2_dust*dls_dust_bb
+              + f1_cmb*f2_cmb*dls_cmb_bb)
+    ls = np.arange(lmax + 1)
+    cl2dl = ls*(ls + 1)/2./np.pi
+    dl2cl = np.array([0., 0.] + list(1./cl2dl[2:]))
+
+    return dls_ee*dl2cl, dls_bb*dl2cl
