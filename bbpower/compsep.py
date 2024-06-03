@@ -1,6 +1,7 @@
 import numpy as np
 import os
 from scipy.linalg import sqrtm
+from scipy.stats import chi2
 
 from bbpipe import PipelineStage
 from .types import NpzFile, FitsFile, YamlFile, DirFile
@@ -243,6 +244,9 @@ class BBCompSep(PipelineStage):
                                      self.n_bpws * self.ncross])
         self.invcov = np.linalg.solve(self.bbcovar,
                                       np.identity(len(self.bbcovar)))
+        np.savez(self.get_output('output_dir')+'/data_ell_cl_invcov.npz',
+                 ell=self.ell_b, cl=self.bbdata, invcov=self.invcov)
+
         return
 
     def load_cmb(self):
@@ -600,7 +604,7 @@ class BBCompSep(PipelineStage):
         Likelihood with priors.
         """
         prior = self.params.lnprior(par)
-        if not np.isfinite(prior):
+        if not np.isfinite(prior) or np.isnan(prior):
             return -np.inf
 
         return prior + self.lnlike(par)
@@ -630,35 +634,40 @@ class BBCompSep(PipelineStage):
         fname_temp = self.get_output('output_dir')+'/emcee.npz.h5'
         backend = emcee.backends.HDFBackend(fname_temp)
 
-        nwalkers = self.config['nwalkers']
+        n_walkers = self.config['nwalkers']
         n_iters = self.config['n_iters']
+
         ndim = len(self.params.p0)
         found_file = os.path.isfile(fname_temp)
 
         try:
             nchain = len(backend.get_chain())
+            if backend.get_chain().shape[1:] != (n_walkers, n_iters):
+                print("Previous sampler has incompatible chain dimensions. "
+                      "Restarting from scratch.")
+                found_file = False
         except AttributeError:
             found_file = False
-
+            
         if not found_file:
-            backend.reset(nwalkers, ndim)
+            backend.reset(n_walkers, ndim)
             pos = [self.params.p0 + 1.e-3*np.random.randn(ndim)
-                   for i in range(nwalkers)]
+                   for i in range(n_walkers)]
             nsteps_use = n_iters
         else:
             print("Restarting from previous run")
             pos = None
-            nsteps_use = max(n_iters-nchain, 0)
+            nsteps_use = max(n_iters - nchain, 0)
 
-        with Pool() as pool:
+        with Pool():
             import time
             start = time.time()
-            sampler = emcee.EnsembleSampler(nwalkers, ndim,
+            sampler = emcee.EnsembleSampler(n_walkers, ndim,
                                             self.lnprob,
                                             backend=backend)
             if nsteps_use > 0:
                 sampler.run_mcmc(pos, nsteps_use, store=True, progress=True)
-                end = time.time()
+            end = time.time()
 
         return sampler, end-start
 
@@ -705,18 +714,18 @@ class BBCompSep(PipelineStage):
 
         return output
 
-    def minimizer(self):
+    def minimizer(self, maximum_posterior=True):
         """
-        Find maximum likelihood
+        Find maximum posterior or likelihood value
         """
         from scipy.optimize import minimize
 
-        def chi2(par):
-            c2 = -2*self.lnprob(par)
+        def chisq(par):
+            f = self.lnprob if maximum_posterior else self.lnlike
+            c2 = -2*f(par)
             return c2
-
-        res = minimize(chi2, self.params.p0,
-                       method="Powell")
+        print("p0:", self.params.p0)
+        res = minimize(chisq, self.params.p0, method="Powell")
         return res.x
 
     def fisher(self):
@@ -726,11 +735,11 @@ class BBCompSep(PipelineStage):
         import numdifftools as nd
         from scipy.optimize import minimize
 
-        def chi2(par):
+        def chisq(par):
             c2 = -2*self.lnprob(par)
             return c2
 
-        res = minimize(chi2, self.params.p0,
+        res = minimize(chisq, self.params.p0,
                        method="Powell")
 
         def lnprobd(p):
@@ -746,8 +755,8 @@ class BBCompSep(PipelineStage):
         """
         Evaluate at a single point
         """
-        chi2 = -2*self.lnprob(self.params.p0)
-        return chi2
+        chisq = -2*self.lnprob(self.params.p0)
+        return chisq
 
     def timing(self, n_eval=300):
         """
@@ -761,7 +770,32 @@ class BBCompSep(PipelineStage):
 
         return end-start, (end-start)/n_eval
     
-    def predicted_spectra(self, at_min=True, save_npz=True):
+    def compute_chisq(self):
+        """
+        """
+        print("Computing maximum likelihood")
+        sampler = self.minimizer(maximum_posterior=False)
+        chisq = -2*self.lnlike(sampler)
+        chisq_str = "inf" if chisq == float("inf") else f"{int(chisq):3d}"
+        ndof = len(self.bbcovar) - len(self.params.p0)
+        pte = chi2.sf(chisq, ndof)
+        np.savez(
+            self.get_output('output_dir')+'/chisq.npz',
+            params=sampler,
+            names=self.params.p_free_names,
+            chisq=chisq, ndof=ndof, pte=pte
+        )
+        print("-------------------------------")
+        print("Best-fit values:")
+        print("-------------------------------")
+        for n, p in zip(self.params.p_free_names, sampler):
+            print(n+" = %.2f" % p)
+        print("-------------------------------")
+        print(f"Chi-squared: {chisq_str} \n"
+              f"Ndof: {int(ndof):3d} \nPTE: {pte:.5f}")
+        print("-------------------------------")
+    
+    def predicted_spectra(self, at_min=True, save_npz=False):
         """
         Evaluates model at a the maximum likelihood and 
         writes predicted spectra into a numpy array 
@@ -773,20 +807,19 @@ class BBCompSep(PipelineStage):
         else:
             p = self.params.p0
         pars = self.params.build_params(p)
-        print(pars)
         model_cls = self.model(pars)
         if self.config['bands'] == 'all':
             tr_names = list(self.s.tracers.keys())
         else:
             tr_names = self.config['bands']
         if save_npz:
-            np.savez(self.get_output('output_dir')+'/cells_model.npz',
+            np.savez(self.get_output('output_dir')+'/cells_best_fit.npz',
                      tracers=tr_names, 
                      ls=self.ell_b,
                      dls=model_cls)
             return
         s = sacc.Sacc()
-        for it, tn in enumerate(tr_names):
+        for tn in tr_names:
             t = self.s.tracers[tn]
             s.add_tracer('NuMap', tn, quantity='cmb_polarization',
                          spin=2, nu=t.nu, bandpass=t.bandpass,
@@ -802,7 +835,7 @@ class BBCompSep(PipelineStage):
             win = sacc.BandpowerWindow(self.bpw_l, self.windows[ind].T)
             s.add_ell_cl(cltyp, t1, t2, self.ell_b, cl, window=win)
         s.add_covariance(self.bbcovar)
-        s.save_fits(self.get_output('output_dir')+'/cells_model.fits',
+        s.save_fits(self.get_output('output_dir')+'/cells_best_fit.fits',
                     overwrite=True)
         
         return
@@ -811,6 +844,9 @@ class BBCompSep(PipelineStage):
         from shutil import copyfile
         copyfile(self.get_input('config'), self.get_output('config_copy'))
         self.setup_compsep()
+        self.compute_chisq()
+        self.predicted_spectra()
+
         if self.config.get('sampler') == 'emcee':
             sampler, timing = self.emcee_sampler()
             np.savez(self.get_output('output_dir')+'/emcee.npz',
@@ -829,23 +865,12 @@ class BBCompSep(PipelineStage):
             np.savez(self.get_output('output_dir')+'/fisher.npz',
                      params=p0, fisher=fisher,
                      names=self.params.p_free_names)
-        elif self.config.get('sampler') == 'maximum_likelihood':
-            sampler = self.minimizer()
-            chi2 = -2*self.lnprob(sampler)
-            np.savez(self.get_output('output_dir')+'/chi2.npz',
-                     params=sampler,
-                     names=self.params.p_free_names,
-                     chi2=chi2, ndof=len(self.bbcovar))
-            print("Best fit:")
-            for n, p in zip(self.params.p_free_names, sampler):
-                print(n+" = %.3lE" % p)
-            print("Chi2: %.3lE" % chi2)
         elif self.config.get('sampler') == 'single_point':
             sampler = self.singlepoint()
             np.savez(self.get_output('output_dir')+'/single_point.npz',
-                     chi2=sampler, ndof=len(self.bbcovar),
+                     chisq=sampler, ndof=len(self.bbcovar),
                      names=self.params.p_free_names)
-            print("Chi2:", sampler, len(self.bbcovar))
+            print("Chi-squared:", sampler, len(self.bbcovar))
         elif self.config.get('sampler') == 'timing':
             sampler = self.timing()
             np.savez(self.get_output('output_dir')+'/timing.npz',
@@ -853,11 +878,6 @@ class BBCompSep(PipelineStage):
                      names=self.params.p_free_names)
             print("Total time:", sampler[0])
             print("Time per eval:", sampler[1])
-        elif self.config.get('sampler')=='predicted_spectra':
-            at_min = self.config.get('predict_at_minimum', True)
-            save_npz = not self.config.get('predict_to_sacc', False)
-            sampler = self.predicted_spectra(at_min=at_min, save_npz=save_npz)
-            print("Predicted spectra saved")
         else:
             raise ValueError("Unknown sampler")
 
