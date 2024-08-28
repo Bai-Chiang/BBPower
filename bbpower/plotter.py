@@ -3,12 +3,13 @@ from .types import FitsFile, DirFile, HTMLFile, NpzFile
 import sacc
 import numpy as np
 import matplotlib
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import dominate as dom
 import dominate.tags as dtg
 import os
 from itertools import combinations_with_replacement as cwr
+
+matplotlib.use('Agg')
 
 
 labels_dict = {
@@ -69,62 +70,62 @@ class BBPlotter(PipelineStage):
             dtg.script(type='text/javascript', src='script.js')
         with self.doc:
             dtg.h1("Pipeline outputs")
-            dtg.h2("Contents:",id='contents')
-            lst=dtg.ul()
-            lst+=dtg.li(dtg.a('Bandpasses',href='#bandpasses'))
-            lst+=dtg.li(dtg.a('Coadded power spectra',href='#coadded'))
+            dtg.h2("Contents:", id='contents')
+            lst = dtg.ul()
+            lst += dtg.li(dtg.a('Bandpasses', href='#bandpasses'))
+            lst += dtg.li(dtg.a('Coadded power spectra', href='#coadded'))
             if self.config['plot_nulls']:
-                lst+=dtg.li(dtg.a('Null tests',href='#nulls'))
+                lst += dtg.li(dtg.a('Null tests', href='#nulls'))
             if self.config['plot_likelihood']:
-                lst+=dtg.li(dtg.a('Likelihood',href='#like'))
+                lst += dtg.li(dtg.a('Likelihood', href='#like'))
 
     def add_bandpasses(self):
         with self.doc:
-            dtg.h2("Bandpasses",id='bandpasses')
-            lst=dtg.ul()
+            dtg.h2("Bandpasses", id='bandpasses')
+            lst = dtg.ul()
             # Overall plot
-            title='Bandpasses summary'
-            fname=self.get_output('plots')+'/bpass_summary.png'
+            title = 'Bandpasses summary'
+            fname = self.get_output('plots') + '/bpass_summary.png'
             plt.figure()
-            plt.title(title,fontsize=14)
+            plt.title(title, fontsize=14)
             for n, t in self.s_cd_x.tracers.items():
-                nu_mean=np.sum(t.bandpass*t.nu**3)/np.sum(t.bandpass*t.nu**2)
-                plt.plot(t.nu,t.bandpass/np.amax(t.bandpass),label=n+', $\\langle\\nu\\rangle=%.1lf\\,{\\rm GHz}$'%nu_mean)
-            plt.xlabel('$\\nu\\,[{\\rm GHz}]$',fontsize=14)
-            plt.ylabel('Transmission',fontsize=14)
-            plt.ylim([0.,1.3])
-            plt.legend(frameon=0,ncol=2,labelspacing=0.1,loc='upper left')
+                nu_mean = np.sum(t.bandpass*t.nu**3)/np.sum(t.bandpass*t.nu**2)
+                plt.plot(t.nu, t.bandpass/np.amax(t.bandpass),
+                         label=n+', $\\langle\\nu\\rangle=%.1lf\\,{\\rm GHz}$' % nu_mean)  # noqa
+            plt.xlabel('$\\nu\\,[{\\rm GHz}]$', fontsize=14)
+            plt.ylabel('Transmission', fontsize=14)
+            plt.ylim([0., 1.3])
+            plt.legend(frameon=0, ncol=2, labelspacing=0.1, loc='upper left')
             plt.xscale('log')
-            plt.savefig(fname,bbox_inches='tight')
+            plt.savefig(fname, bbox_inches='tight')
             plt.close()
-            lst+=dtg.li(dtg.a(title,href=fname))
+            lst += dtg.li(dtg.a(title, href=fname))
 
             for n, t in self.s_cd_x.tracers.items():
-                title='Bandpass '+n
-                fname=self.get_output('plots')+'/bpass_'+n+'.png'
+                fname = self.get_output('plots') + '/bpass_' + n + '.png'
                 plt.figure()
-                plt.title(title,fontsize=14)
-                plt.plot(t.nu,t.bandpass/np.amax(t.bandpass))
-                plt.xlabel('$\\nu\\,[{\\rm GHz}]$',fontsize=14)
-                plt.ylabel('Transmission',fontsize=14)
-                plt.ylim([0.,1.05])
-                plt.savefig(fname,bbox_inches='tight')
+                plt.title(title, fontsize=14)
+                plt.plot(t.nu, t.bandpass/np.amax(t.bandpass))
+                plt.xlabel('$\\nu\\,[{\\rm GHz}]$', fontsize=14)
+                plt.ylabel('Transmission', fontsize=14)
+                plt.ylim([0., 1.05])
+                plt.savefig(fname, bbox_inches='tight')
                 plt.close()
-                lst+=dtg.li(dtg.a(title,href=fname))
-            dtg.div(dtg.a('Back to TOC',href='#contents'))
+                lst += dtg.li(dtg.a(title, href=fname))
+            dtg.div(dtg.a('Back to TOC', href='#contents'))
 
     def add_coadded(self):
         (do_best, do_fid, do_cross,
          do_tot, do_noise) = (
             self.best_fit is not None,
             self.s_fid is not None,
-            self.s_cd_x is not None, 
+            self.s_cd_x is not None,
             self.s_cd_t is not None,
             self.s_cd_n is not None
         )
         if do_best:
             best_fit_label = "\n".join(
-                [fr"{l}: {b:.2f}"for l, b in self.best_fit.items()]
+                [fr"{ll}: {b}"for ll, b in self.best_fit.items()]
             )
         else:
             best_fit_label = ""
@@ -145,7 +146,7 @@ class BBPlotter(PipelineStage):
                     if len(l_cro) == 0:
                         print(f"No data for {typ} found. Skip.")
                         continue
-                    
+
                     # Plot title
                     title = f"{t1} x {t2}, {typ}"
                     # Plot file
@@ -153,24 +154,24 @@ class BBPlotter(PipelineStage):
                     fname += f"{t1}_x_{t2}_{typ}.png"
                     print(fname)
                     f, (main, sub) = plt.subplots(
-                        2, 1, sharex=True, figsize=(6,4),
+                        2, 1, sharex=True, figsize=(6, 4),
                         gridspec_kw={'height_ratios': [3, 1]}
                     )
                     f.suptitle(title, fontsize=14)
                     if do_fid:
                         l_fid, cl_fid = self.s_fid.get_ell_cl(typ, t1, t2)
                         msk_fid = np.logical_and(l_fid <= self.lmax,
-                                                l_fid >= self.lmin)
+                                                 l_fid >= self.lmin)
                         main.plot(l_fid[msk_fid], cl_fid[msk_fid], 'k--',
-                                label='Fiducial')
+                                  label='Fiducial')
                     if do_best:
                         l_best, cl_best = self.s_best.get_ell_cl(
                             typ, t1, t2
                         )
                         msk_best = np.logical_and(l_best <= self.lmax,
-                                                    l_best >= self.lmin)
+                                                  l_best >= self.lmin)
                         main.plot(l_best[msk_best], cl_best[msk_best],
-                                    'k-', label="Best fit")
+                                  'k-', label="Best fit")
                         main.plot([], [], "w-", label=best_fit_label)
                     sub.axhspan(-3, 3, facecolor="k", alpha=0.1)
                     sub.axhspan(-2, 2, facecolor="k", alpha=0.2)
@@ -181,9 +182,11 @@ class BBPlotter(PipelineStage):
                             typ, t1, t2, return_cov=True
                         )
                         msk_tot = np.logical_and(l_tot <= self.lmax,
-                                                    l_tot >= self.lmin)
-                        x, y, yerr = (l_tot[msk_tot], cl_tot[msk_tot],
-                                        np.sqrt(np.fabs(np.diag(cov_tot)))[msk_tot])  # noqa 
+                                                 l_tot >= self.lmin)
+                        x, y, yerr = (
+                            l_tot[msk_tot], cl_tot[msk_tot],
+                            np.sqrt(np.fabs(np.diag(cov_tot)))[msk_tot]
+                        )
                         main.errorbar(
                             x - offset, y, yerr, label='Total coadd',
                             color="darkred", marker=".",
@@ -205,7 +208,7 @@ class BBPlotter(PipelineStage):
                             typ, t1, t2, return_cov=True
                         )
                         msk_noi = np.logical_and(l_noi <= self.lmax,
-                                                    l_noi >= self.lmin)
+                                                 l_noi >= self.lmin)
                         x, y, yerr = (l_noi[msk_noi], cl_noi[msk_noi],
                                         np.sqrt(np.fabs(np.diag(cov_noi)))[msk_noi])  # noqa
                         main.errorbar(
@@ -226,7 +229,7 @@ class BBPlotter(PipelineStage):
                         )
 
                     msk_cro = np.logical_and(l_cro <= self.lmax,
-                                                l_cro >= self.lmin)
+                                             l_cro >= self.lmin)
                     x, y, yerr = (
                         l_cro[msk_cro], cl_cro[msk_cro],
                         np.sqrt(np.fabs(np.diag(cov_cro)))[msk_cro]
@@ -253,7 +256,7 @@ class BBPlotter(PipelineStage):
                             x, (y - cl_best[msk_best])/yerr,
                             color="navy", marker=".", markerfacecolor="navy",
                             linestyle=""
-                        )    
+                        )
                     sub.set_ylabel(
                         r"$(C_\ell-C_\ell^{\rm best})/\sigma(C_\ell)$"
                     )
@@ -271,7 +274,7 @@ class BBPlotter(PipelineStage):
                     lst += dtg.li(dtg.a(title, href=fname))
 
             dtg.div(dtg.a('Back to TOC', href='#contents'))
-                
+
     def add_nulls(self):
         """
         """
@@ -284,29 +287,30 @@ class BBPlotter(PipelineStage):
 
             for t1, t2 in self.s_null.get_tracer_combinations():
                 title = f"{t1} x {t2}"
-                fname =self.get_output('plots')+'/cls_null_'
-                fname+= f"{t1}_x_{t2}.png"
+                fname = self.get_output('plots')+'/cls_null_'
+                fname += f"{t1}_x_{t2}.png"
                 print(fname)
                 plt.figure()
-                plt.title(title,fontsize=15)
+                plt.title(title, fontsize=15)
                 for p1 in range(2):
                     for p2 in range(2):
                         x = self.pols[p1] + self.pols[p2]
-                        typ='cl_' + x
-                        l, cl, cv = self.s_null.get_ell_cl(typ, t1, t2, return_cov=True)
-                        msk = l<self.lmax
+                        typ = 'cl_' + x
+                        l, cl, cv = self.s_null.get_ell_cl(typ, t1, t2,
+                                                           return_cov=True)
+                        msk = l < self.lmax
                         el = np.sqrt(np.fabs(np.diag(cv)))[msk]
                         plt.errorbar(l[msk], cl[msk]/el,
                                      yerr=np.ones_like(el),
                                      fmt=self.cols_typ[x]+'-', label=x)
-                plt.xlabel('$\\ell$',fontsize=15)
-                plt.ylabel('$C_\\ell/\\sigma_\\ell$',fontsize=15)
+                plt.xlabel('$\\ell$', fontsize=15)
+                plt.ylabel('$C_\\ell/\\sigma_\\ell$', fontsize=15)
                 plt.legend()
-                plt.savefig(fname,bbox_index='tight')
+                plt.savefig(fname, bbox_index='tight')
                 plt.close()
-                lst+=dtg.li(dtg.a(title,href=fname))
+                lst += dtg.li(dtg.a(title, href=fname))
 
-            dtg.div(dtg.a('Back to TOC',href='#contents'))
+            dtg.div(dtg.a('Back to TOC', href='#contents'))
 
     def add_contours(self):
         from getdist import MCSamples
@@ -330,12 +334,11 @@ class BBPlotter(PipelineStage):
             }
 
             # Select only selected parameters for which we have labels
-            names_common = list(set(list(self.chain['names'])) 
+            names_common = list(set(list(self.chain['names']))
                                 & truth.keys()
                                 & set(self.config['params_plot']))
             msk_common = np.array([n in names_common
                                    for n in self.chain['names']])
-            npar = len(names_common)
             _, nsamp, npar_chain = self.chain['chain'].shape
             chain = self.chain['chain'][:, nsamp//4:, :].reshape([-1, npar_chain])[:, msk_common]  # noqa
             names_common = np.array(self.chain['names'])[msk_common]
@@ -355,22 +358,23 @@ class BBPlotter(PipelineStage):
                             filled=True,
                             contour_colors=['navy'],
                             title_limit=1)
-            for i, n in enumerate(names_common):
-                v = truth[n]
-                #g.subplots[i,i].plot([v,v],[0,1],'r-')
-                for j in range(i + 1, npar):
-                    u = truth[names_common[j]]
-                    #g.subplots[j,i].plot([v],[u],'ro')
+
+            # for i, n in enumerate(names_common):
+            #     v = truth[n]
+            #     g.subplots[i,i].plot([v,v],[0,1],'r-')
+            #     for j in range(i + 1, len(names_common)):
+            #         u = truth[names_common[j]]
+            #         g.subplots[j,i].plot([v],[u],'ro')
 
             # Save
-            fname=self.get_output('plots')+'/triangle.pdf'
+            fname = self.get_output('plots') + '/triangle.pdf'
             g.export(fname)
-            lst+=dtg.li(dtg.a("Likelihood contours",href=fname))
+            lst += dtg.li(dtg.a("Likelihood contours", href=fname))
 
-            dtg.div(dtg.a('Back to TOC',href='#contents'))
+            dtg.div(dtg.a('Back to TOC', href='#contents'))
 
     def write_page(self):
-        with open(self.get_output('plots_page'),'w') as f:
+        with open(self.get_output('plots_page'), 'w') as f:
             f.write(self.doc.render())
 
     def read_inputs(self):
@@ -386,21 +390,28 @@ class BBPlotter(PipelineStage):
             self.s_best = sacc.Sacc.load_fits(self.get_input('cells_best_fit'))
         if os.path.isfile(self.get_input('cells_coadded')):
             self.s_cd_x = sacc.Sacc.load_fits(self.get_input('cells_coadded'))
-        if (self.config['plot_coadded_total']
-            and os.path.isfile(self.get_input('cells_coadded_total'))):
+        if (self.config['plot_coadded_total'] and os.path.isfile(self.get_input('cells_coadded_total'))):  # noqa
             self.s_cd_t = sacc.Sacc.load_fits(
                 self.get_input('cells_coadded_total')
             )
-        if (self.config['plot_noise']
-            and os.path.isfile(self.get_input('cells_noise'))):
+        if (self.config['plot_noise'] and os.path.isfile(self.get_input('cells_noise'))):  # noqa
             self.s_cd_n = sacc.Sacc.load_fits(
                 self.get_input('cells_noise')
             )
-        if (self.config['plot_nulls']
-            and os.path.isfile(self.get_input('cells_noise'))):
+        if (self.config['plot_nulls'] and os.path.isfile(self.get_input('cells_noise'))):  # noqa
             self.s_null = sacc.Sacc.load_fits(
                 self.get_input('cells_null')
             )
+
+        # Keep only desired tracers
+        for s in [self.s_fid, self.s_best, self.s_cd_x,
+                  self.s_cd_t, self.s_cd_n, self.s_null]:
+            if s is None:
+                continue
+            tr_list = list(s.tracers.keys())
+            for t in tr_list:
+                if t not in self.config["map_sets"]:
+                    s.remove_tracers([t])
 
         # Chains
         if not os.path.isfile(self.get_input('param_chains')):
@@ -414,10 +425,15 @@ class BBPlotter(PipelineStage):
         if os.path.isfile(self.get_input('chisq')):
             chisq = np.load(self.get_input('chisq'))
             self.best_fit = {
-                labels_dict[n]: p
-                for n, p in zip(chisq["names"], chisq["params"])
+                labels_dict[n]: f"{float(p):.3f}"
+                for n, p in zip(chisq["names"], chisq['params'])
             }
+            self.best_fit["chisq"] = str(int(chisq['chisq']))
+            self.best_fit["ndof"] = str(int(chisq['ndof']))
+            self.best_fit["pte"] = f"{chisq['pte']:.1e}"
+
             self.chisq = chisq["chisq"]
+            self.ndof = chisq["ndof"]
             self.pte = chisq["pte"]
 
         self.cols_typ = {'ee': 'r', 'eb': 'g', 'be': 'y', 'bb': 'b'}
