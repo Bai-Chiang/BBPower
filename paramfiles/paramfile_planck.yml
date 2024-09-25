@@ -7,9 +7,9 @@ global:
     # Use D_l = l*(l+1)*C_l/(2*pi) instead of C_l?
     compute_dell: False
     map_sets:
-      planck_f030:
-        beam_file: /pscratch/sd/k/kwolz/bbdev/SOOPERCOOL/data_planck/beams/beam_planck_f030.dat  # noqa
-        bandpass_file: examples/data/bandpasses/planck_f030.txt
+    #   planck_f030:
+    #     beam_file: /pscratch/sd/k/kwolz/bbdev/SOOPERCOOL/data_planck/beams/beam_planck_f030.dat  # noqa
+    #     bandpass_file: examples/data/bandpasses/planck_f030.txt
       planck_f100:
         beam_file: /pscratch/sd/k/kwolz/bbdev/SOOPERCOOL/data_planck/beams/beam_planck_f100.dat  # noqa
         bandpass_file: examples/data/bandpasses/planck_f100.txt
@@ -31,19 +31,19 @@ theory_params:
         A_lens: 1.
         r_tensor: 0.
     dust:
-        beta_d: 1.54
-        alpha_d_EE: -0.32
-        alpha_d_BB: -0.16
-        A_d_EE: 56.
-        A_d_BB: 37.
+        beta_d: 1.59
+        alpha_d_EE: -0.48
+        alpha_d_BB: -0.44
+        A_d_EE: 61.
+        A_d_BB: 32.
         nu0_d: 353.
-        T_d: 20.
+        T_d: 19.6
     synch:
         beta_s: -3.0
-        alpha_s_EE: -0.7
-        alpha_s_BB: -0.93
-        A_s_EE: 9.0
-        A_s_BB: 1.6
+        alpha_s_EE: -0.79
+        alpha_s_BB: -0.82
+        A_s_EE: 3.4
+        A_s_BB: 1.8
         nu0_s: 23.
 
 
@@ -64,7 +64,7 @@ BBCompSep:
     # If you chose emcee:
     # Number of walkers
     predict_to_sacc: True
-    nwalkers: 64
+    nwalkers: 24
     # Number of iterations per walker
     n_iters: 3000
     # If you chose polychord:
@@ -171,16 +171,16 @@ BBCompSep:
                 nu0_s: ['nu0', 'fixed', [23.]]
             cl_parameters:
                 EE:
-                    #amp_s_ee: ['amp', 'fixed', [9.0]]
+                    #amp_s_ee: ['amp', 'fixed', [3.4]]
                     amp_s_ee: ['amp', 'tophat', [0., 4., "inf"]]
-                    #alpha_s_ee: ['alpha', 'fixed', [-0.7]]
+                    #alpha_s_ee: ['alpha', 'fixed', [-0.79]]
                     alpha_s_ee: ['alpha', 'tophat', [-2., -0.6, 1.]]
                     l0_s_ee: ['ell0', 'fixed', [80.]]
                 BB:
-                    #amp_s_bb: ['amp', 'fixed', [1.6] ]
-                    amp_s_bb: ['amp', 'tophat', [0., 2., "inf"]]
-                    #alpha_s_bb: ['alpha', 'fixed', [-0.93]]
-                    alpha_s_bb: ['alpha', 'tophat', [-2., -0.4, 3.]]
+                    amp_s_bb: ['amp', 'fixed', [1.8] ]
+                    #amp_s_bb: ['amp', 'tophat', [0., 2., "inf"]]
+                    alpha_s_bb: ['alpha', 'fixed', [-0.82]]
+                    #alpha_s_bb: ['alpha', 'tophat', [-2., -0.4, 3.]]
                     l0_s_bb: ['ell0', 'fixed', [80.]]
             moments:
                 # Define gammas for varying spectral indices of components
@@ -201,4 +201,4 @@ BBPlotter:
     # Plot likelihood?
     plot_likelihood: True
     # List of parameters to plot
-    params_plot: [r_tensor, beta_d, beta_s] 
+    params_plot: [r_tensor, beta_d, amp_d_bb, alpha_d_bb, beta_s]
